@@ -9,7 +9,7 @@ const app=express();
 dotenv.config();
 
 app.set('port',process.env.PORT||4162);
-app.set('view engine','html');
+app.set('view engine','ejs');
 
 //약국 api 주소 http://apis.data.go.kr/B552657/ErmctInsttInfoInqireService/getParmacyListInfoInqire
 app.get("/pharmacy_list",(req,res)=>{
@@ -53,7 +53,7 @@ app.use(session({
     }
 }));
 
-app.use(express.static(path.join("C:\Users\donga\WebstormProjects\node_pharmacy","public")));
+app.use(express.static(path.join("C:\\Users\\donga\\WebstormProjects\\node_pharmacy","public")));
 
 app.use((req,res,next)=> {
     const error = new Error(`${req.method} ${req.url} 라우터가 없습니다.`);

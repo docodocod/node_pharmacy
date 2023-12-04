@@ -1,0 +1,148 @@
+<html>
+<head>
+    <script type="text/javascript" src='https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=2p3iks137x'></script>
+    <script src="https://code.jquery.com/jquery-3.6.4.min.js"></script>
+</head>
+<body>
+<div style="margin-top: 20px; margin-button: 10px; font-weight: bold;">
+    약국지도
+    <div id="map" style="width:100%;height:400px;"></div>
+</div>
+
+<script type="text/javascript">
+    $(document).ready(async function() {
+        let XY = await getLocation(); //현재 위치의 좌표값 저장
+        await naver.maps.Service.reverseGeocode({
+            location: new naver.maps.LatLng(XY.lat,XY.lng)
+        },function(status,response){
+            let result=response.result;
+            let items=result.items;
+            let sido_arr=items[0].addrdetail.sido.split(" "); // 시도4
+            let sigugun_arr=items[0].addrdetail.sigugun,split(" "); //시구군
+            let sido="";
+            let sigugun="";
+
+            if(sido_arr.length==1){
+                sido=sido_arr[0];
+                sigugun=sigugun_arr[0];
+            }else(sido_arr.length > 1){
+                sido=sido_arr[0];
+                sigugun=sigugun_arr[1];
+            }
+            console.log(sido);
+            console.log(sigugun);
+
+            $.ajax({                                // 공공데이터 api에서 데이터를 가져오기 위해 ajax 사용
+                url: "/pharmacy_list",
+                type: "GET",
+                cache: false,
+                dataType: "json",
+                data: {                             // 공공데이터 api에서 가져올 데이터 목록을 표시
+                    "QO": "",
+                    "Q1": "",
+                    "QT": "",
+                    "QN": "",
+                    "ORD": "",
+                    "pageNo": "",
+                    "numOfRows": "",
+                },
+                success: function (data) {          //만약 데이터를 성공적으로 가져왔다면
+                    console.log(data);              //데이터 한번 찍어 보기
+
+                    let mapDiv=document.getElementById('map');      // 네이버에서 제공 (지도 초기화)
+                    let mapOptions={                                // 웹이 켜지면 해당 좌표값에 위치가 된다.
+                        center:new naver.maps.LatLng(XY.lat,XY.lng),
+                        zoom: 13,
+                    };
+                    let map = new naver.maps.Map(mapDiv,mapOptions);//map 변수에 담아준다.
+
+                    data.items.item.forEach((it,index)=>{ //가져온 데이터에서 약국정보를 가져오기 위해 forEach()로 데이터를 파싱
+                        let dutyName=it.dutyName;   //약국 이름
+                        let dutyAddr=it.dutyAddr;   //약국 주소
+                        let dutyTel1=it.dutyTel1;   //약국 전화번호
+                        let dutyTime="" //약국 시간은 아래에서 설정
+                        if(it.dutyTime1s && it.dutyTime1c){
+                            dutyTime+="월요일:"+it.dutyTime1s+"~"+it.dutyTime1c+"<br>";
+                        }
+                        if(it.dutyTime2s && it.dutyTime2c){
+                            dutyTime+="화요일:"+it.dutyTime2s+"~"+it.dutyTime2c+"<br>";
+                        }
+                        if(it.dutyTime3s && it.dutyTime3c){
+                            dutyTime+="수요일:"+it.dutyTime3s+"~"+it.dutyTime3c+"<br>";
+                        }
+                        if(it.dutyTime4s && it.dutyTime4c){
+                            dutyTime+="목요일:"+it.dutyTime4s+"~"+it.dutyTime4c+"<br>";
+                        }
+                        if(it.dutyTime5s && it.dutyTime5c){
+                            dutyTime+="금요일:"+it.dutyTime5s+"~"+it.dutyTime5c+"<br>";
+                        }
+                        if(it.dutyTime6s && it.dutyTime6c){
+                            dutyTime+="토요일:"+it.dutyTime6s+"~"+it.dutyTime6c+"<br>";
+                        }
+                        if(it.dutyTime7s && it.dutyTime7c){
+                            dutyTime+="일요일:"+it.dutyTime7s+"~"+it.dutyTime7c+"<br>";
+                        }
+
+
+                        let pharmacy_location=new naver.maps.LatLng(it.wgs84Lat,it.wgs84Lon)
+
+                        let marker = new naver.maps.Marker({ //네이버지도 마커를 사용하기
+                            map: map,
+                            position: pharmacy_location
+                        });
+
+                        let contentString = [           // 약국 데이털르 불러온 정보를 담은 변수를 하나씩 나열
+                            '<div class="iw_inner">',
+                            '   <h3>'+dutyName+'</h3>',
+                            '   <p>'+dutyAddr+'<br />',
+                            '       '+dutyTel1+'<br />',
+                            '       '+dutyTime+'<br />',
+                            '   </p>',
+                            '</div>'
+                        ].join('');
+
+                        let infowindow = new naver.maps.InfoWindow({    //네이버에서 제공 (마커표시 ui)
+                            content: contentString,
+                            maxWidth: 440,
+                            backgroundColor: "#eee",
+                            borderColor: "#2db400",
+                            borderWidth: 5,
+                            anchorSize: new naver.maps.Size(30, 30),
+                            anchorSkew: true,
+                            anchorColor: "#eee",
+                            pixelOffset: new naver.maps.Point(20, -20)
+                        });
+
+                        naver.maps.Event.addListener(marker, "click", function(e) { //해당 지도에 떠있는 마커 표시를 클릭시 수행
+                            if (infowindow.getMap()) {
+                                infowindow.close();
+                            } else {
+                                infowindow.open(map, marker);
+                            }
+                        });
+                    })
+                },
+                error: function (request, status, err) { //만약 데이터를 가져오지 못했다면
+                    console.log(err);
+                },
+            });
+        })
+
+    };
+    async function getLocation() {      //현재 좌표를 불러기 위한 함수
+        let XY = new Object();          // 위도,경도를 받아오기 위해 object 객체 선언
+        if (navigator.geolocation) {    //만약 좌표 값을 불러왔다면
+            let promise = new Promise((resolve, rejected) => {      //동기 형식으로 바꾸기 위해 promise 선언
+                navigator.geolocation.getCurrentPosition((position) => {
+                    resolve(position);
+                }); //현재 좌표 값을 return
+            });
+            let position = await promise;           //불러온 좌표값을 position 변수에 저장
+            XY.lat = position.coords.latitude;      //포지션 변수에서 위도를 XY 객체에 저장
+            XY.lng = position.coords.longitude;     //포지션 변수에서 경도를 XY 객체에 저장
+        }
+        return XY;      //XY 객체를 return
+    };
+</script>
+</body>
+</html>
